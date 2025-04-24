@@ -16,6 +16,8 @@ extension CodeScannerView {
     public final class ScannerViewController: UIViewController, UINavigationControllerDelegate {
         private let photoOutput = AVCapturePhotoOutput()
         private var isCapturing = false
+        private var viewfinderSize: CGSize
+        private var viewfinderRect: CGRect = .zero
         private var handler: ((UIImage?) -> Void)?
         var parentView: CodeScannerView!
         var codesFound = Set<String>()
@@ -34,14 +36,16 @@ extension CodeScannerView {
             }
         }
 
-        public init(showViewfinder: Bool = false, parentView: CodeScannerView) {
+        public init(showViewfinder: Bool = false, parentView: CodeScannerView, viewfinderSize: CGSize) {
             self.parentView = parentView
             self.showViewfinder = showViewfinder
+            self.viewfinderSize = viewfinderSize
             super.init(nibName: nil, bundle: nil)
         }
 
         required init?(coder: NSCoder) {
             self.showViewfinder = false
+            self.viewfinderSize = .zero
             super.init(coder: coder)
         }
         
@@ -51,6 +55,14 @@ extension CodeScannerView {
             imagePicker.delegate = self
             imagePicker.presentationController?.delegate = self
             present(imagePicker, animated: true, completion: nil)
+        }
+        
+        func isCompletelyInsideViewfinder(_ result: ScanResult, viewfinder: CGRect) -> Bool {
+            return result.corners.allSatisfy { viewfinder.contains($0) }
+        }
+        
+        private func triggerFailureFeedback() {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
         }
         
         @objc func openGalleryFromButton(_ sender: UIButton) {
@@ -186,7 +198,12 @@ extension CodeScannerView {
             previewLayer.frame = view.layer.bounds
             previewLayer.videoGravity = .resizeAspectFill
             view.layer.addSublayer(previewLayer)
-            addViewFinder()
+            switch parentView.scanMode {
+            case .manualInViewfinder:
+                setViewfinderPosition()
+            default:
+                addViewFinder()
+            }
 
             reset()
 
@@ -288,6 +305,15 @@ extension CodeScannerView {
                 imageView.widthAnchor.constraint(equalToConstant: 200),
                 imageView.heightAnchor.constraint(equalToConstant: 200),
             ])
+        }
+        
+        func setViewfinderPosition() {
+            viewfinderRect = CGRect(
+                x: view.frame.width / 2.0 - viewfinderSize.width / 2.0,
+                y: view.frame.height / 2.0 - viewfinderSize.height / 2.0,
+                width: viewfinderSize.width,
+                height: viewfinderSize.height
+            )
         }
 
         override public func viewDidDisappear(_ animated: Bool) {
@@ -445,6 +471,7 @@ extension CodeScannerView.ScannerViewController: AVCaptureMetadataOutputObjectsD
               !didFinishScanning,
               !isCapturing,
               let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
+              let transformed = previewLayer.transformedMetadataObject(for: readableObject) as? AVMetadataMachineReadableCodeObject,
               let stringValue = readableObject.stringValue else {
 
             return
@@ -452,7 +479,7 @@ extension CodeScannerView.ScannerViewController: AVCaptureMetadataOutputObjectsD
 
         handler = { [weak self] image in
             guard let self else { return }
-            let result = ScanResult(string: stringValue, type: readableObject.type, image: image, corners: readableObject.corners)
+            let result = ScanResult(string: stringValue, type: readableObject.type, image: image, corners: transformed.corners)
 
             switch parentView.scanMode {
             case .once:
@@ -465,6 +492,15 @@ extension CodeScannerView.ScannerViewController: AVCaptureMetadataOutputObjectsD
                     found(result)
                     didFinishScanning = true
                 }
+                
+            case .manualInViewfinder:
+                if !didFinishScanning, isWithinManualCaptureInterval, isCompletelyInsideViewfinder(result, viewfinder: viewfinderRect) {
+                    found(result)
+                } else if !didFinishScanning, isWithinManualCaptureInterval {
+                    triggerFailureFeedback()
+                    parentView.showFailureAlert.wrappedValue = true
+                }
+                didFinishScanning = true
 
             case .oncePerCode:
                 if !codesFound.contains(stringValue) {

@@ -59,10 +59,13 @@ public enum ScanMode {
 
     /// Scan only when capture button is tapped.
     case manual
+    
+    /// Scan only when capture button is tapped and check if the identified barcode is inside the bounds of the viewfinder.
+    case manualInViewfinder
 
     var isManual: Bool {
         switch self {
-        case .manual:
+        case .manual, .manualInViewfinder:
             return true
         case .once, .oncePerCode, .continuous, .continuousExcept:
             return false
@@ -82,12 +85,14 @@ public struct CodeScannerView: UIViewControllerRepresentable {
     public let manualSelect: Bool
     public let scanInterval: Double
     public let showViewfinder: Bool
+    public let viewfinderSize: CGSize
     public let requiresPhotoOutput: Bool
     public var simulatedData = ""
     public var shouldVibrateOnSuccess: Bool
     public var isTorchOn: Bool
     public var isPaused: Bool
     public var isGalleryPresented: Binding<Bool>
+    public var showFailureAlert: Binding<Bool>
     public var videoCaptureDevice: AVCaptureDevice?
     public var completion: (Result<ScanResult, ScanError>) -> Void
 
@@ -97,12 +102,14 @@ public struct CodeScannerView: UIViewControllerRepresentable {
         manualSelect: Bool = false,
         scanInterval: Double = 2.0,
         showViewfinder: Bool = false,
+        viewfinderSize: CGSize = .zero,
         requiresPhotoOutput: Bool = true,
         simulatedData: String = "",
         shouldVibrateOnSuccess: Bool = true,
         isTorchOn: Bool = false,
         isPaused: Bool = false,
         isGalleryPresented: Binding<Bool> = .constant(false),
+        showfailureAlert: Binding<Bool> = .constant(false),
         videoCaptureDevice: AVCaptureDevice? = AVCaptureDevice.bestForVideo,
         completion: @escaping (Result<ScanResult, ScanError>) -> Void
     ) {
@@ -110,6 +117,7 @@ public struct CodeScannerView: UIViewControllerRepresentable {
         self.scanMode = scanMode
         self.manualSelect = manualSelect
         self.showViewfinder = showViewfinder
+        self.viewfinderSize = viewfinderSize
         self.requiresPhotoOutput = requiresPhotoOutput
         self.scanInterval = scanInterval
         self.simulatedData = simulatedData
@@ -117,12 +125,13 @@ public struct CodeScannerView: UIViewControllerRepresentable {
         self.isTorchOn = isTorchOn
         self.isPaused = isPaused
         self.isGalleryPresented = isGalleryPresented
+        self.showFailureAlert = showfailureAlert
         self.videoCaptureDevice = videoCaptureDevice
         self.completion = completion
     }
 
     public func makeUIViewController(context: Context) -> ScannerViewController {
-        return ScannerViewController(showViewfinder: showViewfinder, parentView: self)
+        return ScannerViewController(showViewfinder: showViewfinder, parentView: self, viewfinderSize: viewfinderSize)
     }
 
     public func updateUIViewController(_ uiViewController: ScannerViewController, context: Context) {
