@@ -375,7 +375,7 @@ extension CodeScannerView {
                     manualCaptureButton.heightAnchor.constraint(equalToConstant: 60),
                     manualCaptureButton.widthAnchor.constraint(equalTo: manualCaptureButton.heightAnchor),
                     view.centerXAnchor.constraint(equalTo: manualCaptureButton.centerXAnchor),
-                    view.safeAreaLayoutGuide.bottomAnchor.constraint(equalTo: manualCaptureButton.bottomAnchor, constant: 32)
+                    view.safeAreaLayoutGuide.bottomAnchor.constraint(equalTo: manualCaptureButton.topAnchor, constant: view.frame.height / 4)
                 ])
             }
             
