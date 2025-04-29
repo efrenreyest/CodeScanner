@@ -471,15 +471,22 @@ extension CodeScannerView.ScannerViewController: AVCaptureMetadataOutputObjectsD
               !didFinishScanning,
               !isCapturing,
               let readableObject = metadataObject as? AVMetadataMachineReadableCodeObject,
-              let transformed = previewLayer.transformedMetadataObject(for: readableObject) as? AVMetadataMachineReadableCodeObject,
               let stringValue = readableObject.stringValue else {
 
             return
         }
+        
+        var corners: [CGPoint] = []
+        #if targetEnvironment(simulator)
+        corners = readableObject.corners
+        #else
+        let transformed = previewLayer.transformedMetadataObject(for: readableObject) as? AVMetadataMachineReadableCodeObject
+        corners = transformed?.corners ?? []
+        #endif
 
         handler = { [weak self] image in
             guard let self else { return }
-            let result = ScanResult(string: stringValue, type: readableObject.type, image: image, corners: transformed.corners)
+            let result = ScanResult(string: stringValue, type: readableObject.type, image: image, corners: corners)
 
             switch parentView.scanMode {
             case .once:
